@@ -1,0 +1,76 @@
+services:
+  wp:
+    image: wordpress:latest
+    ports:
+      - ${IP}:${PORT}:80
+    user: 1000:1000
+    volumes:
+      - ./config/wp_php.ini:/usr/local/etc/php/conf.d/conf.ini
+      - ./wp-app:/var/www/html
+#      - wordpress_data:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DB_NAME}
+    depends_on:
+      - db
+
+  db:
+    image: mariadb:latest
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - ${IP}:${DB_PORT}:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+      MYSQL_PASSWORD: "${DB_PASSWORD}"
+      MYSQL_USER: "${DB_USER}"
+      MYSQL_DATABASE: "${DB_NAME}"
+
+  wpcli:
+    image: wordpress:cli
+    volumes:
+      - ./config/wp_php.ini:/usr/local/etc/php/conf.d/conf.ini
+      - ./wp-app:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: "${DB_NAME}"
+      WORDPRESS_DB_USER: "${DB_USER}"
+      WORDPRESS_DB_PASSWORD: "${DB_PASSWORD}"
+    depends_on:
+      - db
+      - wp
+
+  pma:
+    image: phpmyadmin:latest  # https://hub.docker.com/_/phpmyadmin
+    environment:
+      # https://docs.phpmyadmin.net/en/latest/setup.html#docker-environment-variables
+      PMA_HOST: db
+      PMA_PORT: "${PMA_PORT}"
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+      UPLOAD_LIMIT: 50M
+    ports:
+      - ${IP}:${PMA_PORT}:80
+    links:
+      - db:db
+    volumes:
+      - ./config/pma_php.ini:/usr/local/etc/php/conf.d/conf.ini
+      - ./config/pma_config.php:/etc/phpmyadmin/config.user.inc.php
+
+  ftp:
+      container_name: ftp-server
+      environment:
+          - PUBLIC_IP=${IP}
+          - FTP_PASS=${FTP_PASSWORD}
+          - FTP_USER=${FTP_USERNAME}
+      image: garethflowers/ftp-server
+      ports:
+          - "20-21:20-21/tcp"
+          - "40000-40009:40000-40009/tcp" # For passive mode
+      volumes:
+          - "./wp-app:/home/${FTP_USERNAME}"
+
+volumes:
+  db_data:
+  ftp-data:
